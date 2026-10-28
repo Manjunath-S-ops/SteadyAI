@@ -4,9 +4,7 @@ import { useAuth } from '@/auth';
 import { resolvePostAuthRedirect, sanitizeAuthRedirect } from '@/auth/routing';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
-
-type AuthMode = 'sign-in' | 'sign-up';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 
 const benefits = [
   'Personalized coaching based on your goals and preferences.',
@@ -22,25 +20,11 @@ function SignInPageContent() {
     isHydrated,
     isAuthenticated,
     isGoogleAuthConfigured,
-    isAppleAuthConfigured,
-    isPasswordAuthConfigured,
     isSigningInWithGoogle,
-    isSigningInWithApple,
-    isSigningInWithPassword,
-    isSigningUpWithPassword,
-    signInWithGoogle,
-    signInWithApple,
-    signInWithPassword,
-    signUpWithPassword
+    signInWithGoogle
   } = useAuth();
-  const [mode, setMode] = useState<AuthMode>('sign-in');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const next = useMemo(() => sanitizeAuthRedirect(searchParams.get('next') || '/onboarding'), [searchParams]);
-  const isBusy = isSigningInWithPassword || isSigningUpWithPassword || isSigningInWithGoogle || isSigningInWithApple;
 
   useEffect(() => {
     let active = true;
@@ -63,43 +47,12 @@ function SignInPageContent() {
     };
   }, [isAuthenticated, isHydrated, next, router, token]);
 
-  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function handleGoogleSignIn() {
     setError(null);
-    setNotice(null);
-
     try {
-      if (mode === 'sign-up') {
-        if (password !== confirmPassword) {
-          throw new Error('Passwords do not match.');
-        }
-
-        const result = await signUpWithPassword(email, password, { redirectTo: next });
-        if (result.needsEmailConfirmation) {
-          setNotice('Check your email to confirm your account. After confirmation, return here to sign in.');
-        }
-        return;
-      }
-
-      await signInWithPassword(email, password, { redirectTo: next });
-    } catch (signInError) {
-      setError(signInError instanceof Error ? signInError.message : 'Unable to continue. Please try again.');
-    }
-  }
-
-  async function handleOAuth(provider: 'google' | 'apple') {
-    setError(null);
-    setNotice(null);
-
-    try {
-      if (provider === 'google') {
-        await signInWithGoogle({ redirectTo: next });
-        return;
-      }
-
-      await signInWithApple({ redirectTo: next });
-    } catch (oauthError) {
-      setError(oauthError instanceof Error ? oauthError.message : `Unable to continue with ${provider}. Please try again.`);
+      signInWithGoogle({ redirectTo: next });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to continue with Google. Please try again.');
     }
   }
 
@@ -126,142 +79,70 @@ function SignInPageContent() {
           </div>
         </section>
 
-        <section className="order-1 rounded-[34px] border border-[#e8d7c6] bg-[#1d140d] p-5 text-white shadow-[0_30px_120px_rgba(29,20,13,0.24)] dark:border-[#4a372b] dark:bg-[#0f0b08] sm:p-7 lg:order-2">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#f3c99f]">Account access</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em]">Welcome to SteadyAI</h2>
-            </div>
-            <Link href="/" className="rounded-full border border-white/20 px-3 py-2 text-xs font-semibold text-[#f3e7da]">
-              Home
-            </Link>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 rounded-full border border-[#5e4a3b] bg-[#2a1e15] p-1">
-            {(['sign-in', 'sign-up'] as const).map((nextMode) => (
-              <button
-                key={nextMode}
-                type="button"
-                onClick={() => {
-                  setMode(nextMode);
-                  setError(null);
-                  setNotice(null);
-                }}
-                className={`min-h-11 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  mode === nextMode ? 'bg-[#f4d4b0] text-[#1d140d]' : 'text-[#d8c0ad] hover:bg-white/5'
-                }`}
-              >
-                {nextMode === 'sign-in' ? 'Sign in' : 'Create account'}
-              </button>
-            ))}
-          </div>
-
-          {isPasswordAuthConfigured ? (
-            <form className="mt-5 space-y-4" onSubmit={handlePasswordSubmit}>
-              <label className="block text-sm font-medium">
-                <span className="mb-2 block text-[#d8c0ad]">Email</span>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="min-h-14 w-full rounded-[22px] border border-[#5e4a3b] bg-[#2a1e15] px-4 py-3 text-base text-white outline-none transition placeholder:text-[#9e8a7b] focus:border-[#f3c99f] focus:ring-4 focus:ring-[#f3c99f]/12"
-                  placeholder="you@example.com"
-                />
-              </label>
-              <label className="block text-sm font-medium">
-                <span className="mb-2 block text-[#d8c0ad]">Password</span>
-                <input
-                  type="password"
-                  autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'}
-                  required
-                  minLength={mode === 'sign-up' ? 8 : undefined}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="min-h-14 w-full rounded-[22px] border border-[#5e4a3b] bg-[#2a1e15] px-4 py-3 text-base text-white outline-none transition placeholder:text-[#9e8a7b] focus:border-[#f3c99f] focus:ring-4 focus:ring-[#f3c99f]/12"
-                  placeholder={mode === 'sign-up' ? 'At least 8 characters' : 'Enter password'}
-                />
-              </label>
-              {mode === 'sign-up' ? (
-                <label className="block text-sm font-medium">
-                  <span className="mb-2 block text-[#d8c0ad]">Confirm password</span>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    minLength={8}
-                    value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                    className="min-h-14 w-full rounded-[22px] border border-[#5e4a3b] bg-[#2a1e15] px-4 py-3 text-base text-white outline-none transition placeholder:text-[#9e8a7b] focus:border-[#f3c99f] focus:ring-4 focus:ring-[#f3c99f]/12"
-                    placeholder="Re-enter password"
-                  />
-                </label>
-              ) : null}
-
-              {error ? (
-                <p className="rounded-[18px] border border-[#ffb4ab]/30 bg-[#3b1714] px-4 py-3 text-sm leading-6 text-[#ffdad6]">
-                  {error}
-                </p>
-              ) : null}
-              {notice ? (
-                <p className="rounded-[18px] bg-[#f4d4b0] px-4 py-3 text-sm leading-6 text-[#1d140d]">
-                  {notice}
-                </p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={isBusy}
-                className="min-h-14 w-full rounded-full bg-[#f4d4b0] px-5 py-4 text-base font-bold text-[#1d140d] shadow-[0_18px_40px_rgba(0,0,0,0.24)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {mode === 'sign-up'
-                  ? isSigningUpWithPassword
-                    ? 'Creating account...'
-                    : 'Create account with email'
-                  : isSigningInWithPassword
-                    ? 'Signing in...'
-                    : 'Continue with email'}
-              </button>
-            </form>
-          ) : (
-            <p className="mt-5 rounded-[18px] border border-[#ffb4ab]/30 bg-[#3b1714] px-4 py-3 text-sm leading-6 text-[#ffdad6]">
-              Email sign-in is not configured yet. Add the Supabase URL and publishable key to enable account access.
-            </p>
-          )}
-
-          {(isGoogleAuthConfigured || isAppleAuthConfigured) ? (
-            <div className="mt-6 border-t border-[#5e4a3b] pt-5">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d8c0ad]">Or continue with</p>
-              <div className="mt-4 grid gap-3">
-                {isGoogleAuthConfigured ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleOAuth('google');
-                    }}
-                    disabled={isBusy}
-                    className="min-h-14 w-full rounded-full bg-white px-5 py-4 text-base font-bold text-[#1d140d] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSigningInWithGoogle ? 'Connecting Google...' : 'Continue with Google'}
-                  </button>
-                ) : null}
-                {isAppleAuthConfigured ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleOAuth('apple');
-                    }}
-                    disabled={isBusy}
-                    className="min-h-14 w-full rounded-full border border-white/30 px-5 py-4 text-base font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSigningInWithApple ? 'Connecting Apple...' : 'Continue with Apple'}
-                  </button>
-                ) : null}
+        <section className="order-1 rounded-[34px] border border-[#e8d7c6] bg-[#1d140d] p-5 text-white shadow-[0_30px_120px_rgba(29,20,13,0.24)] dark:border-[#4a372b] dark:bg-[#0f0b08] sm:p-7 lg:order-2 flex flex-col justify-between min-h-[460px]">
+          <div>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#f3c99f]">Account access</p>
+                <h2 className="mt-3 text-3xl font-bold tracking-[-0.05em]">Welcome to SteadyAI</h2>
               </div>
+              <Link href="/" className="rounded-full border border-white/20 px-3 py-2 text-xs font-semibold text-[#f3e7da] hover:bg-white/10 transition">
+                Home
+              </Link>
             </div>
-          ) : null}
+
+            <p className="mt-6 text-sm leading-6 text-[#d8c0ad]">
+              We use secure, single sign-on authentication so you never have to remember another password. Sign in or create your account instantly using Google.
+            </p>
+          </div>
+
+          <div className="mt-8 space-y-4">
+            {error ? (
+              <p className="rounded-[18px] border border-[#ffb4ab]/30 bg-[#3b1714] px-4 py-3 text-sm leading-6 text-[#ffdad6]">
+                {error}
+              </p>
+            ) : null}
+
+            {isGoogleAuthConfigured ? (
+              <button
+                id="sign-in-with-google"
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isSigningInWithGoogle}
+                className="min-h-14 w-full rounded-full bg-white px-5 py-4 text-base font-bold text-[#1d140d] hover:bg-[#f7efe6] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-3 shadow-[0_12px_30px_rgba(255,255,255,0.05)]"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                {isSigningInWithGoogle ? 'Redirecting to Google...' : 'Continue with Google'}
+              </button>
+            ) : (
+              <p className="rounded-[18px] border border-[#ffb4ab]/30 bg-[#3b1714] px-4 py-3 text-sm leading-6 text-[#ffdad6]">
+                Authentication is not configured yet. Add the Google Client ID to enable access.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-8 text-center text-xs text-[#9e8a7b]">
+            By continuing, you agree to SteadyAI&apos;s{' '}
+            <Link href="/terms" className="underline hover:text-white transition">Terms of Service</Link> and{' '}
+            <Link href="/privacy" className="underline hover:text-white transition">Privacy Policy</Link>.
+          </div>
         </section>
       </div>
     </main>

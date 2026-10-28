@@ -83,6 +83,15 @@ enum HealthRecordType {
   WEIGHT
   HEIGHT
   BLOOD_GLUCOSE
+  // PHIA-inspired vitals metrics
+  ACTIVE_ZONE_MINUTES
+  HRV_RESTING
+  RESTING_HEART_RATE
+  BLOOD_PRESSURE
+  OXYGEN_SATURATION
+  RESPIRATORY_RATE
+  BODY_TEMPERATURE
+  VO2_MAX
 }
 
 enum SyncBatchStatus {
@@ -120,6 +129,22 @@ enum MealTemplateSource {
   CURATED
   USER_CREATED
   EXTERNAL
+}
+
+// Meal context: when in relation to activity was the meal consumed
+enum NutritionMealContext {
+  BEFORE_WORKOUT
+  AFTER_WORKOUT
+  REGULAR
+  LATE_NIGHT
+}
+
+// How the nutrition entry was created
+enum NutritionDataSource {
+  AI_TEXT
+  AI_IMAGE
+  MANUAL
+  HEALTH_CONNECT_IMPORT
 }
 
 enum ExerciseMediaType {
@@ -171,6 +196,11 @@ model User {
   workspaceMemberships WorkspaceMember[]
   ownedWorkspaces      Workspace[]
   agentRuns            AgentRun[]
+  nutritionGoal        UserNutritionGoal?
+  waterIntakeLogs      WaterIntakeLog[]
+  apiKeys              UserApiKeys?
+  nutritionDailySummaries NutritionDailySummary[]
+  nutritionHealthCorrelations NutritionHealthCorrelation[]
 }
 
 model Workspace {
@@ -462,6 +492,11 @@ model NutritionEntry {
   totalProteinG Decimal?              @db.Decimal(8, 2)
   totalCarbsG   Decimal?              @db.Decimal(8, 2)
   totalFatG     Decimal?              @db.Decimal(8, 2)
+  // Meal categorization
+  mealType      MealType?
+  mealContext   NutritionMealContext?
+  dataSource    NutritionDataSource   @default(AI_TEXT)
+  notes         String?
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -471,6 +506,7 @@ model NutritionEntry {
 
   @@index([userId, consumedAt])
   @@index([status])
+  @@index([userId, mealType])
 }
 
 model NutritionImage {
@@ -486,19 +522,30 @@ model NutritionImage {
 }
 
 model NutritionItem {
-  id         String         @id @default(uuid()) @db.Uuid
-  entryId    String         @db.Uuid
-  name       String
-  quantity   Decimal?       @db.Decimal(10, 2)
-  unit       String?
-  calories   Int
-  proteinG   Decimal?       @db.Decimal(8, 2)
-  carbsG     Decimal?       @db.Decimal(8, 2)
-  fatG       Decimal?       @db.Decimal(8, 2)
-  confidence Decimal?       @db.Decimal(5, 4)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  entry      NutritionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  id             String         @id @default(uuid()) @db.Uuid
+  entryId        String         @db.Uuid
+  name           String
+  quantity       Decimal?       @db.Decimal(10, 2)
+  unit           String?
+  calories       Int
+  proteinG       Decimal?       @db.Decimal(8, 2)
+  carbsG         Decimal?       @db.Decimal(8, 2)
+  fatG           Decimal?       @db.Decimal(8, 2)
+  confidence     Decimal?       @db.Decimal(5, 4)
+  fiberG         Decimal?       @db.Decimal(8, 2)
+  sodiumMg       Decimal?       @db.Decimal(10, 2)
+  // Extended micronutrients (PHIA-inspired rich nutrition data)
+  sugarG         Decimal?       @db.Decimal(8, 2)
+  saturatedFatG  Decimal?       @db.Decimal(8, 2)
+  cholesterolMg  Decimal?       @db.Decimal(10, 2)
+  potassiumMg    Decimal?       @db.Decimal(10, 2)
+  vitaminCMg     Decimal?       @db.Decimal(8, 2)
+  ironMg         Decimal?       @db.Decimal(8, 2)
+  calciumMg      Decimal?       @db.Decimal(10, 2)
+  glycemicIndex  Int?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  entry          NutritionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@index([entryId])
 }
@@ -550,6 +597,91 @@ model MealTemplate {
   @@index([calories])
   @@index([proteinG])
   @@index([isActive, source])
+}
+
+model UserNutritionGoal {
+  id                    String   @id @default(uuid()) @db.Uuid
+  userId                String   @unique @db.Uuid
+  dailyCalorieTarget    Int      @default(2000)
+  dailyProteinG         Decimal? @db.Decimal(8, 2)
+  dailyCarbsG           Decimal? @db.Decimal(8, 2)
+  dailyFatG             Decimal? @db.Decimal(8, 2)
+  dailyFiberG           Decimal? @db.Decimal(8, 2)
+  dailyWaterMl          Int      @default(2000)
+  // Extended targets (PHIA-inspired comprehensive goals)
+  dailySugarG           Decimal? @db.Decimal(8, 2)
+  dailySodiumMg         Decimal? @db.Decimal(10, 2)
+  dailyCholesterolMg    Decimal? @db.Decimal(10, 2)
+  trackingMode          String   @default("basic") // "basic" | "detailed" | "advanced"
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// PHIA-inspired: aggregated daily nutrition summary for quick dashboard access
+model NutritionDailySummary {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  date          DateTime @db.Date
+  totalCalories Int      @default(0)
+  totalProteinG Decimal  @default(0) @db.Decimal(8, 2)
+  totalCarbsG   Decimal  @default(0) @db.Decimal(8, 2)
+  totalFatG     Decimal  @default(0) @db.Decimal(8, 2)
+  totalFiberG   Decimal? @db.Decimal(8, 2)
+  totalSodiumMg Decimal? @db.Decimal(10, 2)
+  totalSugarG   Decimal? @db.Decimal(8, 2)
+  waterMl       Int      @default(0)
+  entryCount    Int      @default(0)
+  calorieGoal   Int?
+  proteinGoalG  Decimal? @db.Decimal(8, 2)
+  goalMetAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+// PHIA-inspired: links nutrition data to health/activity records for correlation analysis
+model NutritionHealthCorrelation {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @db.Uuid
+  nutritionDate    DateTime @db.Date
+  healthRecordId   String?  @db.Uuid
+  activityType     String?
+  caloriesBurned   Int?
+  netCalories      Int?
+  proteinAdequacy  Decimal? @db.Decimal(5, 2) // % of daily protein goal met
+  hydrationScore   Decimal? @db.Decimal(5, 2) // % of daily water goal met
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, nutritionDate])
+}
+
+model WaterIntakeLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  amountMl    Int
+  loggedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, loggedAt])
+}
+
+model UserApiKeys {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @db.Uuid
+  geminiApiKey  String?
+  groqApiKey    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AgentDefinition {

@@ -8,6 +8,6 @@ export function getApiBaseUrl(isServer: boolean): string {
   return process.env.NEXT_PUBLIC_API_BASE_URL || SERVER_FALLBACK_URL;
 }
 
-export function isSupabaseBrowserAuthConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+export function isGoogleAuthConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
 }

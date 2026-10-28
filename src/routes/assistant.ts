@@ -113,7 +113,7 @@ function pickAssistantRoute(message: string): AssistantRoute {
     return { type: 'EDUCATOR', toolName: 'steadyai.educator_help' };
   }
 
-  if (/\b(workout|fitness|exercise|training|strength|cardio)\b/.test(normalized)) {
+  if (/\b(workout|fitness|exercise|training|strength|cardio|video|videos|routine|stretch|yoga|squat|pushup|push-up|pullup|abs|core|hiit|legs?|arms?|chest)\b/.test(normalized)) {
     return { type: 'WORKOUT', toolName: 'steadyai.workout_coach' };
   }
 
@@ -145,7 +145,7 @@ function detectAssistantIntent(message: string): AssistantIntent {
   if (/\b(myth|misinformation|evidence|study|citation|true or false)\b/.test(normalized)) {
     return 'EDUCATION';
   }
-  if (/\b(workout|fitness|exercise|training|routine|strength|cardio)\b/.test(normalized)) {
+  if (/\b(workout|fitness|exercise|training|routine|strength|cardio|video|videos|routine|stretch|yoga|squat|pushup|push-up|pullup|abs|core|hiit|legs?|arms?|chest)\b/.test(normalized)) {
     return 'FITNESS';
   }
   if (/\b(meal|nutrition|grocery|protein|calorie|diet|macro|lunch|dinner|breakfast|snack|chicken)\b/.test(normalized)) {
@@ -296,46 +296,351 @@ function buildWorkoutPlan(prompt: string): AssistantWorkoutPlan {
   const harder = /\b(harder|advanced|intense|challenge)\b/.test(normalized);
   const easier = /\b(easy|easier|beginner|recover|gentle)\b/.test(normalized) || lowImpact;
 
-  const base: AssistantWorkoutExercise[] = [
-    {
-      name: lowImpact ? 'March in Place' : 'Jumping Jacks',
-      durationMin: easier ? 3 : 4,
-      reps: easier ? 'Move at a steady pace' : 'Complete 60 total reps',
-      note: 'Warm up at a controlled pace and keep breathing steady.'
-    },
-    {
-      name: lowImpact ? 'Bodyweight Box Squat' : 'Bodyweight Squat',
-      durationMin: 4,
-      reps: harder ? '4 sets of 15 reps' : easier ? '3 sets of 10 reps' : '3 sets of 12 reps',
-      note: 'Keep chest upright and push through the heels.'
-    },
-    {
-      name: harder ? 'Push-Up + Shoulder Tap' : 'Push-Up',
-      durationMin: 4,
-      reps: harder ? '4 sets of 10 reps' : easier ? '3 sets of 6 reps' : '3 sets of 8 reps',
-      note: 'Use wall or incline push-ups if floor push-ups are too much.'
-    },
-    {
-      name: lowImpact ? 'Glute Bridge' : 'Reverse Lunge',
-      durationMin: 4,
-      reps: harder ? '3 sets of 14 reps per side' : easier ? '3 sets of 8 reps per side' : '3 sets of 10 reps per side',
-      note: lowImpact ? 'Drive through heels and squeeze glutes at the top.' : 'Keep the front knee stable over mid-foot.'
-    },
-    {
-      name: 'Forearm Plank',
-      durationMin: easier ? 3 : 4,
-      reps: harder ? '4 sets of 45 seconds' : easier ? '3 sets of 20 seconds' : '3 sets of 30 seconds',
-      note: 'Brace the core and keep hips level.'
-    }
-  ];
+  // Detect specific workout type or muscle group from prompt
+  const isYoga = /\b(yoga|stretch(ing)?|flexibility|mobility|poses?)\b/.test(normalized);
+  const isHiit = /\b(hiit|high[-\s]?intensity|interval|circuit|tabata)\b/.test(normalized);
+  const isCardio = /\b(cardio|running|jogging|treadmill|cycling|bike|swimming|aerobic)\b/.test(normalized);
+  const isUpperBody = /\b(upper[-\s]?body|chest|back|shoulder|arm|bicep|tricep|pull[-\s]?up|bench|row|press)\b/.test(normalized);
+  const isLowerBody = /\b(lower[-\s]?body|leg|quad|hamstring|glute|calf|squat|lunge|deadlift)\b/.test(normalized);
+  const isCore = /\b(core|ab(s|dominal)?|plank|crunch|sit[-\s]?up|oblique|six[-\s]?pack)\b/.test(normalized);
+  const isBack = /\b(back|spine|lat|rhomboid|row|deadlift|pull[-\s]?up|rear)\b/.test(normalized);
 
-  if (harder && !lowImpact) {
-    base.push({
-      name: 'Mountain Climbers',
-      durationMin: 3,
-      reps: '3 rounds of 30 seconds',
-      note: 'Optional finisher for extra conditioning.'
-    });
+  let base: AssistantWorkoutExercise[];
+  let focus: string;
+  let title: string;
+
+  if (isYoga) {
+    focus = easier ? 'Gentle yoga and mobility' : harder ? 'Power yoga and deep stretching' : 'Yoga and flexibility';
+    title = 'Yoga & Flexibility Session';
+    base = [
+      {
+        name: 'Cat-Cow Stretch',
+        durationMin: 3,
+        reps: '10 slow cycles, syncing movement with breath',
+        note: 'Inhale as you arch the back (cow), exhale as you round it (cat).'
+      },
+      {
+        name: 'Downward Dog',
+        durationMin: 3,
+        reps: harder ? '4 holds of 45 seconds' : '3 holds of 30 seconds',
+        note: 'Press heels toward the floor and keep a long spine.'
+      },
+      {
+        name: harder ? 'Warrior II → Reverse Warrior' : 'Warrior I',
+        durationMin: 4,
+        reps: '3 rounds of 30 seconds per side',
+        note: 'Keep the front knee over the ankle and breathe steadily.'
+      },
+      {
+        name: 'Seated Forward Fold',
+        durationMin: 3,
+        reps: '3 holds of 30 seconds',
+        note: 'Hinge from the hips, not the lower back, and relax the neck.'
+      },
+      {
+        name: harder ? 'Pigeon Pose' : 'Supine Twist',
+        durationMin: 4,
+        reps: '30–45 seconds each side',
+        note: harder ? 'Support the hip with a folded blanket if needed.' : 'Let gravity do the work; avoid forcing the rotation.'
+      },
+      {
+        name: 'Savasana (Rest)',
+        durationMin: easier ? 5 : 3,
+        reps: 'Lie still and breathe deeply',
+        note: 'Relax every muscle group and allow the body to integrate the session.'
+      }
+    ];
+  } else if (isHiit) {
+    focus = easier ? 'Low-intensity interval training' : harder ? 'Advanced HIIT conditioning' : 'High-intensity interval training';
+    title = 'HIIT Circuit Workout';
+    base = [
+      {
+        name: 'Jumping Jacks',
+        durationMin: 2,
+        reps: '30 seconds on, 10 seconds rest × 3',
+        note: 'Warm up the whole body at a moderate pace.'
+      },
+      {
+        name: harder ? 'Burpees' : 'Squat Jumps',
+        durationMin: 4,
+        reps: harder ? '40 seconds on, 20 seconds rest × 4' : '30 seconds on, 15 seconds rest × 3',
+        note: harder ? 'Land softly and go right into the next rep.' : 'Land with soft knees and reset before the next jump.'
+      },
+      {
+        name: 'Push-Up',
+        durationMin: 3,
+        reps: harder ? '40 seconds on, 20 seconds rest × 3' : '30 seconds on, 15 seconds rest × 3',
+        note: 'Maintain a rigid plank position throughout each rep.'
+      },
+      {
+        name: harder ? 'Mountain Climbers' : 'High Knees',
+        durationMin: 3,
+        reps: '40 seconds on, 20 seconds rest × 3',
+        note: harder ? 'Drive knees toward the chest as fast as form allows.' : 'Pump arms and drive knees to hip height.'
+      },
+      {
+        name: 'Alternating Reverse Lunges',
+        durationMin: 3,
+        reps: harder ? '40 seconds on, 20 seconds rest × 3' : '30 seconds on, 15 seconds rest × 3',
+        note: 'Stay tall and controlled even when fatigued.'
+      },
+      {
+        name: 'Forearm Plank Hold',
+        durationMin: 3,
+        reps: harder ? '3 × 45 seconds' : '3 × 30 seconds',
+        note: 'Use the rest period to fully recover breathing before the next set.'
+      }
+    ];
+  } else if (isCardio) {
+    focus = easier ? 'Light aerobic conditioning' : harder ? 'Cardio endurance challenge' : 'Steady-state cardio session';
+    title = 'Cardio Conditioning Workout';
+    base = [
+      {
+        name: 'Brisk Walk or Light Jog',
+        durationMin: 5,
+        reps: 'Warm-up pace for 5 minutes',
+        note: 'Start easy and let heart rate rise gradually.'
+      },
+      {
+        name: harder ? 'Run or Fast Jog Intervals' : 'Steady Jog or Brisk Walk',
+        durationMin: harder ? 6 : 8,
+        reps: harder ? '1 min fast, 1 min easy × 3 rounds' : 'Continuous at conversational pace',
+        note: harder ? 'You should be breathing hard but able to say short phrases.' : 'Aim for a pace where you can still hold a conversation.'
+      },
+      {
+        name: 'High Knees',
+        durationMin: 3,
+        reps: '3 rounds of 30 seconds with 15 second rest',
+        note: 'Drive knees up to hip height and pump arms for rhythm.'
+      },
+      {
+        name: harder ? 'Jump Rope or Jumping Jacks' : 'Side Steps or Step Touch',
+        durationMin: 4,
+        reps: '3 rounds of 40 seconds',
+        note: 'Keep energy up and maintain a steady rhythm.'
+      },
+      {
+        name: 'Cool-Down Walk',
+        durationMin: 4,
+        reps: 'Walk at easy pace',
+        note: 'Gradually lower heart rate before stopping.'
+      },
+      {
+        name: 'Standing Hamstring & Quad Stretch',
+        durationMin: 3,
+        reps: '30 seconds each muscle, each side',
+        note: 'Never skip the cool-down stretch after cardio.'
+      }
+    ];
+  } else if (isBack) {
+    focus = easier ? 'Beginner back strengthening' : harder ? 'Back strength and pulling power' : 'Back strength and posture';
+    title = 'Back Strengthening Workout';
+    base = [
+      {
+        name: 'Cat-Cow Warm-Up',
+        durationMin: 2,
+        reps: '10 slow cycles',
+        note: 'Mobilize the whole spine before loading it.'
+      },
+      {
+        name: noEquipment ? 'Superman Hold' : 'Dumbbell Row',
+        durationMin: 4,
+        reps: harder ? '4 sets of 12 reps per side' : easier ? '3 sets of 8 reps' : '3 sets of 10 reps',
+        note: noEquipment ? 'Squeeze the glutes and hold the top position for 2 seconds.' : 'Keep the back flat and elbow close to the body.'
+      },
+      {
+        name: 'Reverse Snow Angel (Prone)',
+        durationMin: 3,
+        reps: '3 sets of 12 slow reps',
+        note: 'Keep arms off the floor throughout; squeeze shoulder blades together.'
+      },
+      {
+        name: noEquipment ? 'Bodyweight Deadlift Hinge' : 'Romanian Deadlift',
+        durationMin: 4,
+        reps: harder ? '4 sets of 12 reps' : easier ? '3 sets of 8 reps' : '3 sets of 10 reps',
+        note: 'Hinge from hips with a flat back; feel the hamstrings stretch.'
+      },
+      {
+        name: harder ? 'Pull-Up or Negative Pull-Up' : 'Inverted Row or Band Pull-Apart',
+        durationMin: 4,
+        reps: harder ? '3 sets of 6–8 reps' : '3 sets of 12 reps',
+        note: harder ? 'Focus on full range of motion and avoid swinging.' : 'Squeeze the shoulder blades at the peak of the movement.'
+      },
+      {
+        name: 'Child\'s Pose',
+        durationMin: 2,
+        reps: 'Hold 30–45 seconds × 2',
+        note: 'Decompress the spine and relax after the pulling work.'
+      }
+    ];
+  } else if (isUpperBody) {
+    focus = easier ? 'Beginner upper body toning' : harder ? 'Upper body strength and muscle' : 'Upper body strength';
+    title = 'Upper Body Workout';
+    base = [
+      {
+        name: 'Arm Circles & Shoulder Rolls',
+        durationMin: 2,
+        reps: '20 circles each direction',
+        note: 'Warm up the shoulder joints before loading them.'
+      },
+      {
+        name: harder ? 'Wide-Grip Push-Up' : 'Standard Push-Up',
+        durationMin: 4,
+        reps: harder ? '4 sets of 12 reps' : easier ? '3 sets of 6–8 reps' : '3 sets of 10 reps',
+        note: 'Use wall or incline if floor push-ups are too difficult.'
+      },
+      {
+        name: noEquipment ? 'Pike Push-Up (Shoulder Press)' : 'Overhead Press',
+        durationMin: 4,
+        reps: harder ? '4 sets of 10 reps' : easier ? '3 sets of 8 reps' : '3 sets of 10 reps',
+        note: 'Press directly overhead and avoid flaring the elbows excessively.'
+      },
+      {
+        name: noEquipment ? 'Diamond Push-Up' : 'Tricep Dip',
+        durationMin: 3,
+        reps: harder ? '3 sets of 12 reps' : easier ? '3 sets of 6 reps' : '3 sets of 8 reps',
+        note: 'Keep elbows close to the body and lower with control.'
+      },
+      {
+        name: noEquipment ? 'Doorframe Curl or Towel Curl' : 'Bicep Curl',
+        durationMin: 3,
+        reps: harder ? '3 sets of 12 reps per side' : easier ? '3 sets of 8 reps' : '3 sets of 10 reps',
+        note: 'Squeeze at the top and lower slowly to maximize muscle work.'
+      },
+      {
+        name: 'Band Pull-Apart or Rear Delt Fly',
+        durationMin: 3,
+        reps: '3 sets of 15 reps',
+        note: 'Pull the band or arms apart slowly to strengthen rear deltoids and improve posture.'
+      }
+    ];
+  } else if (isLowerBody) {
+    focus = easier ? 'Beginner leg toning' : harder ? 'Lower body strength and power' : 'Lower body strength';
+    title = 'Lower Body Workout';
+    base = [
+      {
+        name: 'Leg Swing & Hip Circle Warm-Up',
+        durationMin: 2,
+        reps: '10 swings each direction, each leg',
+        note: 'Loosen the hips and knees before loading the lower body.'
+      },
+      {
+        name: harder ? 'Jump Squat' : lowImpact ? 'Bodyweight Box Squat' : 'Bodyweight Squat',
+        durationMin: 4,
+        reps: harder ? '4 sets of 15 reps' : easier ? '3 sets of 10 reps' : '3 sets of 12 reps',
+        note: harder ? 'Land softly and immediately sink into the next rep.' : 'Keep chest tall and push through mid-foot.'
+      },
+      {
+        name: lowImpact ? 'Step-Back Lunge' : 'Alternating Reverse Lunge',
+        durationMin: 4,
+        reps: harder ? '3 sets of 14 reps per side' : easier ? '3 sets of 8 reps per side' : '3 sets of 10 reps per side',
+        note: 'Keep the front shin vertical and avoid the knee caving inward.'
+      },
+      {
+        name: 'Glute Bridge',
+        durationMin: 3,
+        reps: harder ? '4 sets of 20 reps' : easier ? '3 sets of 12 reps' : '3 sets of 15 reps',
+        note: 'Squeeze the glutes hard at the top and hold for 1 second.'
+      },
+      {
+        name: harder ? 'Single-Leg Romanian Deadlift' : 'Standing Hamstring Curl',
+        durationMin: 4,
+        reps: harder ? '3 sets of 10 reps per side' : '3 sets of 12 reps per side',
+        note: harder ? 'Keep the hips square and the back flat throughout.' : 'Use a wall for balance if needed.'
+      },
+      {
+        name: 'Calf Raise',
+        durationMin: 2,
+        reps: '3 sets of 20 reps',
+        note: 'Rise onto the balls of the feet fully and lower with control.'
+      }
+    ];
+  } else if (isCore) {
+    focus = easier ? 'Beginner core stability' : harder ? 'Advanced core strength' : 'Core strength and stability';
+    title = 'Core Workout';
+    base = [
+      {
+        name: 'Dead Bug',
+        durationMin: 3,
+        reps: easier ? '3 sets of 6 reps per side' : '3 sets of 8 reps per side',
+        note: 'Press the lower back into the floor the entire time and move slowly.'
+      },
+      {
+        name: harder ? 'Hollow Body Hold' : 'Forearm Plank',
+        durationMin: 4,
+        reps: harder ? '4 sets of 30 seconds' : easier ? '3 sets of 20 seconds' : '3 sets of 30 seconds',
+        note: harder ? 'Keep lower back pressed to the floor and arms extended.' : 'Squeeze glutes and brace the core as if absorbing a punch.'
+      },
+      {
+        name: harder ? 'Bicycle Crunch' : 'Crunch',
+        durationMin: 3,
+        reps: harder ? '3 sets of 20 reps' : easier ? '3 sets of 10 reps' : '3 sets of 15 reps',
+        note: 'Exhale at the top of every crunch and avoid pulling the neck.'
+      },
+      {
+        name: 'Side Plank',
+        durationMin: 3,
+        reps: harder ? '3 sets of 40 seconds each side' : easier ? '3 sets of 20 seconds each side' : '3 sets of 30 seconds each side',
+        note: 'Stack the feet or drop the bottom knee for an easier version.'
+      },
+      {
+        name: harder ? 'V-Up' : 'Leg Raise',
+        durationMin: 3,
+        reps: harder ? '3 sets of 12 reps' : easier ? '3 sets of 8 reps' : '3 sets of 10 reps',
+        note: harder ? 'Keep the lower back pressed to the floor on the way down.' : 'Lower the legs slowly and stop before the back arches.'
+      },
+      {
+        name: 'Russian Twist',
+        durationMin: 3,
+        reps: harder ? '3 sets of 20 reps' : easier ? '3 sets of 10 reps' : '3 sets of 15 reps',
+        note: 'Rotate from the waist, not just the arms, and keep feet off the ground for extra challenge.'
+      }
+    ];
+  } else {
+    // Default full-body plan
+    focus = lowImpact ? 'Low-impact full-body consistency' : harder ? 'Strength and conditioning' : 'Full-body consistency';
+    title = "Today's Workout Plan";
+    base = [
+      {
+        name: lowImpact ? 'March in Place' : 'Jumping Jacks',
+        durationMin: easier ? 3 : 4,
+        reps: easier ? 'Move at a steady pace' : 'Complete 60 total reps',
+        note: 'Warm up at a controlled pace and keep breathing steady.'
+      },
+      {
+        name: lowImpact ? 'Bodyweight Box Squat' : 'Bodyweight Squat',
+        durationMin: 4,
+        reps: harder ? '4 sets of 15 reps' : easier ? '3 sets of 10 reps' : '3 sets of 12 reps',
+        note: 'Keep chest upright and push through the heels.'
+      },
+      {
+        name: harder ? 'Push-Up + Shoulder Tap' : 'Push-Up',
+        durationMin: 4,
+        reps: harder ? '4 sets of 10 reps' : easier ? '3 sets of 6 reps' : '3 sets of 8 reps',
+        note: 'Use wall or incline push-ups if floor push-ups are too much.'
+      },
+      {
+        name: lowImpact ? 'Glute Bridge' : 'Reverse Lunge',
+        durationMin: 4,
+        reps: harder ? '3 sets of 14 reps per side' : easier ? '3 sets of 8 reps per side' : '3 sets of 10 reps per side',
+        note: lowImpact ? 'Drive through heels and squeeze glutes at the top.' : 'Keep the front knee stable over mid-foot.'
+      },
+      {
+        name: 'Forearm Plank',
+        durationMin: easier ? 3 : 4,
+        reps: harder ? '4 sets of 45 seconds' : easier ? '3 sets of 20 seconds' : '3 sets of 30 seconds',
+        note: 'Brace the core and keep hips level.'
+      }
+    ];
+
+    if (harder && !lowImpact) {
+      base.push({
+        name: 'Mountain Climbers',
+        durationMin: 3,
+        reps: '3 rounds of 30 seconds',
+        note: 'Optional finisher for extra conditioning.'
+      });
+    }
   }
 
   const exercises = noEquipment
@@ -347,8 +652,8 @@ function buildWorkoutPlan(prompt: string): AssistantWorkoutPlan {
 
   const plan: AssistantWorkoutPlan = {
     planId: randomPlanId(),
-    title: "Today's Workout Plan",
-    focus: lowImpact ? 'Low-impact full-body consistency' : harder ? 'Strength and conditioning' : 'Full-body consistency',
+    title,
+    focus,
     estimatedTotalMin: exercises.reduce((sum, exercise) => sum + exercise.durationMin, 0),
     exercises
   };

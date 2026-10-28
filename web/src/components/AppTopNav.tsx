@@ -33,12 +33,8 @@ export function AppTopNav() {
   const {
     isAuthenticated,
     isGoogleAuthConfigured,
-    isAppleAuthConfigured,
-    isPasswordAuthConfigured,
     isSigningInWithGoogle,
-    isSigningInWithApple,
     signInWithGoogle,
-    signInWithApple,
     logout
   } = useAuth();
   const navItems = isAuthenticated
@@ -95,38 +91,15 @@ export function AppTopNav() {
             >
               Sign out
             </button>
-          ) : isGoogleAuthConfigured || isAppleAuthConfigured || isPasswordAuthConfigured ? (
-            <div className="flex items-center gap-2">
-              {isPasswordAuthConfigured ? (
-                <Link href="/sign-in" className="rounded-full bg-[#1d140d] px-4 py-2 text-sm text-white">
-                  Email
-                </Link>
-              ) : null}
-              {isGoogleAuthConfigured ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void signInWithGoogle({ redirectTo: DEFAULT_POST_AUTH_PATH });
-                  }}
-                  disabled={isSigningInWithGoogle || isSigningInWithApple}
-                  className="rounded-full bg-[#1d140d] px-4 py-2 text-sm text-white disabled:bg-[#ab9a8c]"
-                >
-                  {isSigningInWithGoogle ? 'Connecting...' : 'Google'}
-                </button>
-              ) : null}
-              {isAppleAuthConfigured ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void signInWithApple({ redirectTo: DEFAULT_POST_AUTH_PATH });
-                  }}
-                  disabled={isSigningInWithGoogle || isSigningInWithApple}
-                  className="rounded-full border border-[#1d140d] bg-white px-4 py-2 text-sm text-[#1d140d] disabled:border-[#cab8a8] disabled:text-[#ab9a8c]"
-                >
-                  {isSigningInWithApple ? 'Connecting...' : 'Apple'}
-                </button>
-              ) : null}
-            </div>
+          ) : isGoogleAuthConfigured ? (
+            <button
+              type="button"
+              onClick={() => signInWithGoogle({ redirectTo: DEFAULT_POST_AUTH_PATH })}
+              disabled={isSigningInWithGoogle}
+              className="rounded-full bg-[#1d140d] px-4 py-2 text-sm text-white disabled:bg-[#ab9a8c]"
+            >
+              {isSigningInWithGoogle ? 'Connecting...' : 'Google'}
+            </button>
           ) : null}
         </div>
 
@@ -161,44 +134,18 @@ export function AppTopNav() {
               >
                 Sign out
               </button>
-            ) : isGoogleAuthConfigured || isAppleAuthConfigured || isPasswordAuthConfigured ? (
-              <>
-                {isPasswordAuthConfigured ? (
-                  <Link
-                    href="/sign-in"
-                    onClick={() => setIsOpen(false)}
-                    className="rounded-full bg-[#1d140d] px-3 py-2 text-left text-sm text-white"
-                  >
-                    Continue with email
-                  </Link>
-                ) : null}
-                {isGoogleAuthConfigured ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsOpen(false);
-                      void signInWithGoogle({ redirectTo: DEFAULT_POST_AUTH_PATH });
-                    }}
-                    disabled={isSigningInWithGoogle || isSigningInWithApple}
-                    className="rounded-full bg-[#1d140d] px-3 py-2 text-left text-sm text-white disabled:bg-[#ab9a8c]"
-                  >
-                    {isSigningInWithGoogle ? 'Connecting...' : 'Continue with Google'}
-                  </button>
-                ) : null}
-                {isAppleAuthConfigured ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsOpen(false);
-                      void signInWithApple({ redirectTo: DEFAULT_POST_AUTH_PATH });
-                    }}
-                    disabled={isSigningInWithGoogle || isSigningInWithApple}
-                    className="rounded-full border border-[#1d140d] px-3 py-2 text-left text-sm text-[#1d140d] disabled:border-[#cab8a8] disabled:text-[#ab9a8c]"
-                  >
-                    {isSigningInWithApple ? 'Connecting...' : 'Continue with Apple'}
-                  </button>
-                ) : null}
-              </>
+            ) : isGoogleAuthConfigured ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  signInWithGoogle({ redirectTo: DEFAULT_POST_AUTH_PATH });
+                }}
+                disabled={isSigningInWithGoogle}
+                className="rounded-full bg-[#1d140d] px-3 py-2 text-left text-sm text-white disabled:bg-[#ab9a8c]"
+              >
+                {isSigningInWithGoogle ? 'Connecting...' : 'Continue with Google'}
+              </button>
             ) : null}
           </div>
         </nav>

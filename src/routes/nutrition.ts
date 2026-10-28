@@ -1,6 +1,7 @@
 import { NutritionInputType } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 
+import { getPrismaClient } from '../db/prisma';
 import { authenticateRequest } from '../middleware/auth';
 import { addNutritionImageToEntry, ingestNutrition, getRecentNutritionEntries } from '../services/nutrition.service';
 
@@ -127,6 +128,67 @@ export async function nutritionRoutes(fastify: FastifyInstance): Promise<void> {
         request.log.error(error);
         return reply.status(400).send({ error: error instanceof Error ? error.message : 'Failed to fetch nutrition entries' });
       }
+    }
+  );
+
+  // GET nutrition goals
+  fastify.get(
+    '/nutrition/goals',
+    { preHandler: [authenticateRequest] },
+    async (request, reply) => {
+      const prisma = getPrismaClient();
+      const goal = await prisma.userNutritionGoal.findUnique({
+        where: { userId: request.userId! }
+      });
+      return reply.send(goal ?? {
+        dailyCalorieTarget: 2000,
+        dailyProteinG: null,
+        dailyCarbsG: null,
+        dailyFatG: null,
+        dailyFiberG: null,
+        dailyWaterMl: 2000
+      });
+    }
+  );
+
+  // POST upsert nutrition goals
+  fastify.post<{ Body: {
+    dailyCalorieTarget?: number;
+    dailyProteinG?: number;
+    dailyCarbsG?: number;
+    dailyFatG?: number;
+    dailyFiberG?: number;
+    dailyWaterMl?: number;
+  } }>(
+    '/nutrition/goals',
+    { preHandler: [authenticateRequest] },
+    async (request, reply) => {
+      const prisma = getPrismaClient();
+      const {
+        dailyCalorieTarget,
+        dailyProteinG,
+        dailyCarbsG,
+        dailyFatG,
+        dailyFiberG,
+        dailyWaterMl
+      } = request.body ?? {};
+
+      const data = {
+        ...(typeof dailyCalorieTarget === 'number' ? { dailyCalorieTarget } : {}),
+        ...(typeof dailyProteinG === 'number' ? { dailyProteinG } : {}),
+        ...(typeof dailyCarbsG === 'number' ? { dailyCarbsG } : {}),
+        ...(typeof dailyFatG === 'number' ? { dailyFatG } : {}),
+        ...(typeof dailyFiberG === 'number' ? { dailyFiberG } : {}),
+        ...(typeof dailyWaterMl === 'number' ? { dailyWaterMl } : {})
+      };
+
+      const goal = await prisma.userNutritionGoal.upsert({
+        where: { userId: request.userId! },
+        create: { userId: request.userId!, ...data },
+        update: data
+      });
+
+      return reply.status(200).send(goal);
     }
   );
 }

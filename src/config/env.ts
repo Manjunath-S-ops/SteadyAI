@@ -10,6 +10,10 @@ interface AppEnv {
   HOST: string;
   DATABASE_URL: string;
   DIRECT_URL: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  JWT_SECRET: string;
+  // Kept for apps-mcp MCP OAuth flow only — not used for user authentication
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
@@ -57,6 +61,10 @@ export const env: AppEnv = {
   HOST: process.env.HOST ?? '0.0.0.0',
   DATABASE_URL: process.env.DATABASE_URL ?? '',
   DIRECT_URL: process.env.DIRECT_URL ?? '',
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? '',
+  JWT_SECRET: process.env.JWT_SECRET ?? '',
+  // apps-mcp MCP OAuth flow (not user auth)
   SUPABASE_URL: process.env.SUPABASE_URL ?? '',
   SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY ?? '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',

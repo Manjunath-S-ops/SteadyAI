@@ -9,6 +9,8 @@ import { PrivacyCard } from '@/features/settings/components/PrivacyCard';
 import { ConnectedServicesCard } from '@/features/settings/components/ConnectedServicesCard';
 import { NotificationsCard } from '@/features/settings/components/NotificationsCard';
 import { ThemeCard } from '@/features/settings/components/ThemeCard';
+import { ApiKeysCard } from '@/features/settings/components/ApiKeysCard';
+import { BmiCalculatorCard } from '@/features/settings/components/BmiCalculatorCard';
 
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -68,37 +70,51 @@ export default function SettingsPage() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+        {/* Left column */}
         <div className="space-y-5">
           <SettingsSection title="Account">
             <ProfileCard context={context} />
           </SettingsSection>
 
-          <SettingsSection title="Privacy & Data">
-            <PrivacyCard />
-          </SettingsSection>
-        </div>
-
-        <div className="space-y-5">
-          <SettingsSection title="Appearance">
-            <ThemeCard />
+          <SettingsSection title="AI Configuration">
+            <ApiKeysCard token={token} />
           </SettingsSection>
 
-          <SettingsSection title="Connected Devices">
-            <ConnectedServicesCard />
+          <SettingsSection title="Body Metrics">
+            <BmiCalculatorCard />
           </SettingsSection>
 
           <SettingsSection title="Notifications">
             <NotificationsCard />
           </SettingsSection>
+        </div>
 
-          <SettingsSection title="Legal">
-            <LegalLinksCard />
+        {/* Right column */}
+        <div className="space-y-5">
+          <SettingsSection title="Appearance">
+            <ThemeCard />
+          </SettingsSection>
+
+          <SettingsSection title="Privacy & Data">
+            <PrivacyCard />
+          </SettingsSection>
+
+          <SettingsSection title="Connected Devices">
+            <ConnectedServicesCard />
           </SettingsSection>
         </div>
       </div>
+
+      <div className="mt-5">
+        <SettingsSection title="Legal">
+          <LegalLinksCard />
+        </SettingsSection>
+      </div>
+
     </div>
   );
+
 }
 
 function SettingsLoading() {

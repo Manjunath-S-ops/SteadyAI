@@ -2,7 +2,7 @@ export const AGENT_DISCLAIMER =
   'Steady AI responses are educational and supportive. They are not medical advice, diagnosis, or treatment.';
 
 export interface StarterPromptGroup {
-  id: 'reset' | 'nutrition' | 'community' | 'myths';
+  id: 'reset' | 'nutrition' | 'community' | 'myths' | 'wellness';
   label: string;
   description: string;
   prompts: string[];
@@ -47,6 +47,16 @@ export const STARTER_PROMPT_GROUPS: StarterPromptGroup[] = [
       'Explain the myth: carbs at night always cause fat gain.',
       'Is sweating more equal to burning more fat? Explain with context.',
       'Help me correct a nutrition myth politely in one short reply.'
+    ]
+  },
+  {
+    id: 'wellness',
+    label: 'Wellness Check',
+    description: 'Daily health insights and wellness questions.',
+    prompts: [
+      'What are 3 simple habits I can add today to improve my overall health?',
+      'How much water should I drink daily based on general guidelines?',
+      'Give me a 5-minute morning wellness routine I can do every day.'
     ]
   }
 ];

@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/auth';
 import { resolvePostAuthRedirect, sanitizeAuthRedirect } from '@/auth/routing';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { getApiBaseUrl } from '@/config/env';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
@@ -16,47 +16,53 @@ function AuthCallbackPageContent() {
     let active = true;
 
     async function resolveGoogleSignIn() {
-      const supabase = createBrowserSupabaseClient();
-      if (!supabase) {
+      const code = searchParams.get('code');
+      const stateParam = searchParams.get('state');
+      const errorParam = searchParams.get('error');
+
+      // Handle OAuth errors from Google (e.g. user denied access)
+      if (errorParam) {
         if (active) {
-          setError('Supabase browser auth is not configured.');
+          setError(errorParam === 'access_denied' ? 'Sign-in was cancelled.' : `Google sign-in error: ${errorParam}`);
+        }
+        return;
+      }
+
+      if (!code) {
+        if (active) {
+          setError('No authorization code received from Google.');
         }
         return;
       }
 
       try {
-        const code = searchParams.get('code');
-        let accessToken: string | null = null;
+        const redirectUri = `${window.location.origin}/auth/callback`;
+        const apiBase = getApiBaseUrl(false);
 
-        if (code) {
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) {
-            throw exchangeError;
-          }
-          accessToken = data.session?.access_token ?? null;
+        const response = await fetch(`${apiBase}/api/auth/google/callback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, redirectUri })
+        });
+
+        if (!response.ok) {
+          const body = (await response.json()) as { error?: string };
+          throw new Error(body.error ?? 'Google sign-in failed.');
         }
 
-        if (!accessToken && typeof window !== 'undefined' && window.location.hash) {
-          const hashParams = new URLSearchParams(window.location.hash.slice(1));
-          accessToken = hashParams.get('access_token');
+        const { token } = (await response.json()) as { token: string; userId: string };
+
+        if (!token) {
+          throw new Error('No token returned from authentication server.');
         }
 
-        if (!accessToken) {
-          const { data, error: sessionError } = await supabase.auth.getSession();
-          if (sessionError) {
-            throw sessionError;
-          }
-          accessToken = data.session?.access_token ?? null;
+        login(token);
+
+        // Use the `state` param as the post-auth redirect destination
+        const next = sanitizeAuthRedirect(stateParam ? decodeURIComponent(stateParam) : '/onboarding');
+        if (active) {
+          router.replace(await resolvePostAuthRedirect(token, next));
         }
-
-        if (!accessToken) {
-          throw new Error('No Supabase session returned from Google sign-in.');
-        }
-
-        login(accessToken);
-
-        const next = sanitizeAuthRedirect(searchParams.get('next') || '/onboarding');
-        router.replace(await resolvePostAuthRedirect(accessToken, next));
       } catch (callbackError) {
         if (active) {
           setError(callbackError instanceof Error ? callbackError.message : 'Google sign-in failed.');

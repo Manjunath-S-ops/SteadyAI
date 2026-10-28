@@ -61,6 +61,11 @@ function normalizeItems(items: unknown): EstimatedNutritionItem[] {
       proteinG: typeof source.proteinG === 'number' ? source.proteinG : undefined,
       carbsG: typeof source.carbsG === 'number' ? source.carbsG : undefined,
       fatG: typeof source.fatG === 'number' ? source.fatG : undefined,
+      // Extended micronutrients from enhanced prompt (nutrition-v2)
+      ...(typeof source.fiberG === 'number' ? { fiberG: source.fiberG } : {}),
+      ...(typeof source.sodiumMg === 'number' ? { sodiumMg: source.sodiumMg } : {}),
+      ...(typeof source.sugarG === 'number' ? { sugarG: source.sugarG } : {}),
+      ...(typeof source.saturatedFatG === 'number' ? { saturatedFatG: source.saturatedFatG } : {}),
       confidence: clampConfidence(typeof source.confidence === 'number' ? source.confidence : undefined)
     });
   }
@@ -96,17 +101,46 @@ async function fetchImageInlineData(imageUrl: string): Promise<{ mimeType: strin
 }
 
 function buildPrompt(rawText: string, imageUrls: string[]): string {
-  const imageHint = imageUrls.length > 0 ? `Image count: ${imageUrls.length}.` : 'No images attached.';
+  const imageHint = imageUrls.length > 0
+    ? `${imageUrls.length} food image(s) attached — analyze all visible items.`
+    : 'Text description only (no images).';
   return [
-    'You are a nutrition estimation model.',
-    'Estimate meal items and nutrition from the user input.',
+    'You are a precise nutrition estimation model for a wellness app.',
+    'Analyze the provided meal description and/or images to estimate nutritional content.',
     imageHint,
-    'Return strict JSON only with this shape:',
-    '{"items":[{"name":"string","quantity":number,"unit":"string","calories":number,"proteinG":number,"carbsG":number,"fatG":number,"confidence":number}], "overallConfidence": number}',
-    'Use confidence range 0..1.',
+    'For each distinct food item identified, estimate its nutritional values.',
+    'Be specific — list ingredients separately if they are clearly distinct items.',
+    'Rules:',
+    '- Return strict JSON only — no markdown, no code fences, no explanations outside JSON.',
+    '- Use confidence range 0.0 to 1.0 (0.0 = very uncertain, 1.0 = very confident).',
+    '- Calories must be a positive integer.',
+    '- All gram/mg values must be positive numbers rounded to 1 decimal place.',
+    '- If a nutrient is unknown, omit it rather than guessing zero.',
+    'Required JSON output:',
+    '{',
+    '  "items": [',
+    '    {',
+    '      "name": "specific food item name",',
+    '      "quantity": number,',
+    '      "unit": "g|oz|cup|tbsp|piece|serving",',
+    '      "calories": number,',
+    '      "proteinG": number,',
+    '      "carbsG": number,',
+    '      "fatG": number,',
+    '      "fiberG": number,',
+    '      "sodiumMg": number,',
+    '      "sugarG": number,',
+    '      "saturatedFatG": number,',
+    '      "confidence": number',
+    '    }',
+    '  ],',
+    '  "overallConfidence": number,',
+    '  "analysisNote": "optional brief note about estimation quality or assumptions"',
+    '}',
     `User input: ${rawText || 'N/A'}`
   ].join('\n');
 }
+
 
 async function estimateWithGemini(rawText: string, imageUrls: string[]): Promise<NutritionEstimationResult> {
   if (!env.GEMINI_API_KEY) {
@@ -156,7 +190,7 @@ async function estimateWithGemini(rawText: string, imageUrls: string[]): Promise
     provider: 'gemini',
     confidence: overallConfidence,
     rawResponse: raw,
-    promptVersion: 'nutrition-v1'
+    promptVersion: 'nutrition-v2'
   };
 }
 
@@ -210,7 +244,7 @@ async function estimateWithGroq(rawText: string, imageUrls: string[]): Promise<N
     provider: 'groq',
     confidence: overallConfidence,
     rawResponse: raw,
-    promptVersion: 'nutrition-v1'
+    promptVersion: 'nutrition-v2'
   };
 }
 

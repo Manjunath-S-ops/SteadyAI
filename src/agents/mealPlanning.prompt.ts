@@ -4,28 +4,47 @@ export const MEAL_PLAN_SCHEMA_VERSION = 'v1';
 
 export function buildMealPlanningPrompt(userSummary: McpUserSummary): string {
   const summaryJson = JSON.stringify(userSummary);
+  const goal = userSummary.profile?.primaryGoal ?? 'balanced wellness';
+  const dietary = Array.isArray(userSummary.profile?.dietaryPreferences) && userSummary.profile.dietaryPreferences.length > 0
+    ? `Dietary constraints: ${userSummary.profile.dietaryPreferences.join(', ')}.`
+    : 'No specific dietary restrictions.';
 
   return [
-    'You are a meal planning assistant for a wellness app.',
-    'Create a practical 3-day meal plan and grocery list from the user summary.',
-    'Use only the provided context and make reasonable, non-medical suggestions.',
-    'Use supportive and encouraging language throughout.',
+    'You are an expert meal planning assistant for a wellness app.',
+    `User goal: ${goal}.`,
+    dietary,
+    'Create a practical, varied 3-day meal plan with a full grocery list.',
+    'Base all suggestions on the user context provided. Make lifestyle-friendly, non-medical suggestions.',
+    'Use warm, encouraging language throughout.',
+    '',
     'Hard requirements:',
-    '- Return strict JSON only.',
-    '- No markdown, no code fences, no extra keys.',
-    '- Exactly 3 day objects, with day values 1, 2, and 3.',
-    '- Each meal must include a brief reason that explains why it is suggested.',
-    '- Include reasoning as plain lifestyle rationale only.',
-    '- Do not include medical advice, diagnosis, treatment, or health claims.',
+    '- Return strict JSON only — no markdown, no code fences, no comments, no extra keys.',
+    '- Exactly 3 day objects with day values 1, 2, 3.',
+    '- Each day must have exactly 4 meal slots: breakfast, lunch, dinner, snack.',
+    '- Each meal must include: name, portion, calories (number), proteinG (number), carbsG (number), fiberG (number), and a brief reason.',
+    '- Calories should be realistic (breakfast 300-500, lunch 400-600, dinner 450-650, snack 100-250).',
+    '- Include reasoning as plain lifestyle rationale only — no medical advice.',
     '- Keep output compact and deterministic in structure.',
+    '',
     'Output JSON schema:',
     '{',
     '  "schemaVersion": "v1",',
+    '  "planTitle": "string",',
     '  "days": [',
     '    {',
     '      "day": 1,',
+    '      "totalCalories": number,',
     '      "meals": [',
-    '        { "slot": "breakfast|lunch|dinner|snack", "name": "string", "portion": "string", "reason": "string" }',
+    '        {',
+    '          "slot": "breakfast|lunch|dinner|snack",',
+    '          "name": "string",',
+    '          "portion": "string",',
+    '          "calories": number,',
+    '          "proteinG": number,',
+    '          "carbsG": number,',
+    '          "fiberG": number,',
+    '          "reason": "1 sentence lifestyle rationale"',
+    '        }',
     '      ]',
     '    }',
     '  ],',
@@ -38,6 +57,7 @@ export function buildMealPlanningPrompt(userSummary: McpUserSummary): string {
     '    "safetyNote": "string"',
     '  }',
     '}',
-    `Input summary: ${summaryJson}`
+    `User context: ${summaryJson}`
   ].join('\n');
 }
+

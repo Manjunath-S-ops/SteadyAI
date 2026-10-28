@@ -11,3 +11,13 @@ prisma/dev.db-journal
 # Local media/assets not stored in Git
 exercise-media/
 android/gradle/gradle-daemon-jvm.properties
+
+# Python & environments
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,9 +1,8 @@
 'use client';
 
-import { isSupabaseBrowserAuthConfigured } from '@/config/env';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { isGoogleAuthConfigured } from '@/config/env';
 import { usePathname, useRouter } from 'next/navigation';
-import { resolvePostAuthRedirect, sanitizeAuthRedirect } from './routing';
+import { sanitizeAuthRedirect } from './routing';
 import {
   createContext,
   useCallback,
@@ -23,18 +22,10 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isHydrated: boolean;
   isGoogleAuthConfigured: boolean;
-  isAppleAuthConfigured: boolean;
-  isPasswordAuthConfigured: boolean;
   isSigningInWithGoogle: boolean;
-  isSigningInWithApple: boolean;
-  isSigningInWithPassword: boolean;
-  isSigningUpWithPassword: boolean;
   login: (jwt: string) => void;
   loginAsDevUser: (userId: string) => void;
-  signInWithGoogle: (options?: { redirectTo?: string }) => Promise<void>;
-  signInWithApple: (options?: { redirectTo?: string }) => Promise<void>;
-  signInWithPassword: (email: string, password: string, options?: { redirectTo?: string }) => Promise<void>;
-  signUpWithPassword: (email: string, password: string, options?: { redirectTo?: string }) => Promise<{ needsEmailConfirmation: boolean }>;
+  signInWithGoogle: (options?: { redirectTo?: string }) => void;
   setToken: (jwt: string | null) => void;
   logout: (options?: { redirectTo?: string }) => void;
 }
@@ -46,70 +37,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userId, setUserIdState] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSigningInWithGoogle, setIsSigningInWithGoogle] = useState(false);
-  const [isSigningInWithApple, setIsSigningInWithApple] = useState(false);
-  const [isSigningInWithPassword, setIsSigningInWithPassword] = useState(false);
-  const [isSigningUpWithPassword, setIsSigningUpWithPassword] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const isGoogleAuthConfigured = isSupabaseBrowserAuthConfigured();
-  const isAppleAuthConfigured = isGoogleAuthConfigured && process.env.NEXT_PUBLIC_ENABLE_APPLE_AUTH === 'true';
-  const isPasswordAuthConfigured = isGoogleAuthConfigured;
+  const googleAuthConfigured = isGoogleAuthConfigured();
 
+  // Hydrate auth state from localStorage on mount
   useEffect(() => {
     const stored = window.localStorage.getItem(AUTH_STORAGE_KEY);
     const storedUserId = window.localStorage.getItem(DEV_USER_ID_STORAGE_KEY);
     setTokenState(stored && stored.trim() ? stored : null);
     setUserIdState(storedUserId && storedUserId.trim() ? storedUserId : null);
-
-    const supabase = createBrowserSupabaseClient();
-    if (!supabase) {
-      setIsHydrated(true);
-      return;
-    }
-
-    let active = true;
-
-    const syncSession = (accessToken: string | null, nextUserId: string | null) => {
-      if (!active) {
-        return;
-      }
-
-      if (accessToken) {
-        window.localStorage.setItem(AUTH_STORAGE_KEY, accessToken);
-        setTokenState(accessToken);
-      } else {
-        window.localStorage.removeItem(AUTH_STORAGE_KEY);
-        setTokenState(null);
-      }
-
-      if (nextUserId) {
-        window.localStorage.removeItem(DEV_USER_ID_STORAGE_KEY);
-        setUserIdState(nextUserId);
-      }
-    };
-
-    void supabase.auth.getSession().then(({ data }) => {
-      syncSession(data.session?.access_token ?? null, data.session?.user?.id ?? null);
-      if (active) {
-        setIsHydrated(true);
-      }
-    });
-
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      syncSession(session?.access_token ?? null, session?.user?.id ?? null);
-      if (active) {
-        setIsHydrated(true);
-      }
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
+    setIsHydrated(true);
   }, []);
 
+  // Sync across tabs
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key === AUTH_STORAGE_KEY) {
@@ -163,130 +104,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persistDevUserId]
   );
 
+  /**
+   * Redirect the browser to Google's OAuth consent page.
+   * After the user authenticates, Google will redirect to /auth/callback?code=...
+   */
   const signInWithGoogle = useCallback(
-    async (options?: { redirectTo?: string }) => {
+    (options?: { redirectTo?: string }) => {
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        throw new Error('Google OAuth client ID is not configured.');
+      }
+
       setIsSigningInWithGoogle(true);
-      try {
-        await signInWithOAuthProvider('google', pathname, options?.redirectTo);
-      } finally {
-        setIsSigningInWithGoogle(false);
-      }
+
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      const next = sanitizeAuthRedirect(options?.redirectTo || (pathname && pathname !== '/' ? pathname : '/onboarding'));
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        access_type: 'offline',
+        prompt: 'consent',
+        // Pass the intended post-auth destination via state
+        state: encodeURIComponent(next)
+      });
+
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     },
     [pathname]
-  );
-
-  const signInWithApple = useCallback(
-    async (options?: { redirectTo?: string }) => {
-      setIsSigningInWithApple(true);
-      try {
-        await signInWithOAuthProvider('apple', pathname, options?.redirectTo);
-      } finally {
-        setIsSigningInWithApple(false);
-      }
-    },
-    [pathname]
-  );
-
-  const signInWithPassword = useCallback(
-    async (email: string, password: string, options?: { redirectTo?: string }) => {
-      const supabase = createBrowserSupabaseClient();
-      if (!supabase) {
-        throw new Error('Supabase browser auth is not configured.');
-      }
-
-      const trimmedEmail = email.trim();
-      if (!trimmedEmail || !password) {
-        throw new Error('Email and password are required.');
-      }
-
-      setIsSigningInWithPassword(true);
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
-          password
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        if (data.session?.access_token) {
-          persistToken(data.session.access_token);
-        }
-        if (data.user?.id) {
-          persistDevUserId(data.user.id);
-        }
-
-        const target = data.session?.access_token
-          ? await resolvePostAuthRedirect(data.session.access_token, options?.redirectTo ?? pathname ?? '/onboarding')
-          : sanitizeAuthRedirect(options?.redirectTo ?? pathname ?? '/onboarding');
-        if (target) {
-          router.replace(target);
-        }
-      } finally {
-        setIsSigningInWithPassword(false);
-      }
-    },
-    [pathname, persistDevUserId, persistToken, router]
-  );
-
-  const signUpWithPassword = useCallback(
-    async (email: string, password: string, options?: { redirectTo?: string }) => {
-      const supabase = createBrowserSupabaseClient();
-      if (!supabase) {
-        throw new Error('Supabase browser auth is not configured.');
-      }
-
-      const trimmedEmail = email.trim();
-      if (!trimmedEmail || !password) {
-        throw new Error('Email and password are required.');
-      }
-
-      if (password.length < 8) {
-        throw new Error('Password must be at least 8 characters.');
-      }
-
-      const emailRedirectTo = new URL('/auth/callback', window.location.origin);
-      const target = sanitizeAuthRedirect(options?.redirectTo ?? pathname ?? '/onboarding');
-      emailRedirectTo.searchParams.set('next', target);
-
-      setIsSigningUpWithPassword(true);
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email: trimmedEmail,
-          password,
-          options: {
-            emailRedirectTo: emailRedirectTo.toString()
-          }
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        if (data.session?.access_token) {
-          persistToken(data.session.access_token);
-          if (data.user?.id) {
-            persistDevUserId(data.user.id);
-          }
-          router.replace(await resolvePostAuthRedirect(data.session.access_token, target));
-          return { needsEmailConfirmation: false };
-        }
-
-        return { needsEmailConfirmation: true };
-      } finally {
-        setIsSigningUpWithPassword(false);
-      }
-    },
-    [pathname, persistDevUserId, persistToken, router]
   );
 
   const logout = useCallback(
     (options?: { redirectTo?: string }) => {
-      const supabase = createBrowserSupabaseClient();
-      if (supabase) {
-        void supabase.auth.signOut();
-      }
       persistToken(null);
       persistDevUserId(null);
       const target = options?.redirectTo ?? '/';
@@ -303,83 +154,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userId,
       isHydrated,
       isAuthenticated: Boolean(token || userId),
-      isGoogleAuthConfigured,
-      isAppleAuthConfigured,
-      isPasswordAuthConfigured,
+      isGoogleAuthConfigured: googleAuthConfigured,
       isSigningInWithGoogle,
-      isSigningInWithApple,
-      isSigningInWithPassword,
-      isSigningUpWithPassword,
       login,
       loginAsDevUser,
       signInWithGoogle,
-      signInWithApple,
-      signInWithPassword,
-      signUpWithPassword,
       setToken: persistToken,
       logout
     }),
     [
-      isAppleAuthConfigured,
-      isGoogleAuthConfigured,
+      googleAuthConfigured,
       isHydrated,
-      isPasswordAuthConfigured,
-      isSigningInWithApple,
       isSigningInWithGoogle,
-      isSigningInWithPassword,
-      isSigningUpWithPassword,
       login,
       loginAsDevUser,
       logout,
       persistToken,
-      signInWithApple,
       signInWithGoogle,
-      signInWithPassword,
-      signUpWithPassword,
       token,
       userId
     ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-async function signInWithOAuthProvider(provider: 'google' | 'apple', pathname: string | null, redirectToOverride?: string): Promise<void> {
-  const supabase = createBrowserSupabaseClient();
-  if (!supabase) {
-    throw new Error('Supabase browser auth is not configured.');
-  }
-  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabasePublishableKey) {
-    throw new Error('Supabase publishable key is not configured.');
-  }
-
-  const redirectTo = new URL('/auth/callback', window.location.origin);
-  const next = sanitizeAuthRedirect(redirectToOverride || (pathname && pathname !== '/' ? pathname : '/onboarding'));
-  if (next) {
-    redirectTo.searchParams.set('next', next);
-  }
-
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: {
-      redirectTo: redirectTo.toString(),
-      queryParams:
-        provider === 'google'
-          ? {
-              apikey: supabasePublishableKey,
-              access_type: 'offline',
-              prompt: 'consent'
-            }
-          : {
-              apikey: supabasePublishableKey
-            }
-    }
-  });
-
-  if (error) {
-    throw error;
-  }
 }
 
 export function useAuth(): AuthContextValue {

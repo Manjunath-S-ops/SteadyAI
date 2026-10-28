@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 
+import { authRoutes } from './auth';
+
 import { agentRoutes } from './agents';
 import { agentOpsRoutes } from './admin/agentops';
 import { assistantRoutes } from './assistant';
@@ -16,8 +18,10 @@ import { reportsRoutes } from './reports';
 import { storeRoutes } from './store';
 import { workoutRoutes } from './workouts';
 import { platformRoutes } from './platform';
+import { userApiKeysRoutes } from './user-api-keys';
 
 export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
+  await fastify.register(authRoutes);
   await fastify.register(agentOpsRoutes, { prefix: '/api' });
   await fastify.register(agentRoutes);
   await fastify.register(assistantRoutes);
@@ -34,4 +38,5 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(storeRoutes);
   await fastify.register(workoutRoutes);
   await fastify.register(platformRoutes);
+  await fastify.register(userApiKeysRoutes);
 }

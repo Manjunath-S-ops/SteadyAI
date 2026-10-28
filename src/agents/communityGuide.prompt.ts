@@ -11,29 +11,70 @@ export interface McpCommunityEngagementSummaryInput {
   lastPostAt: string | null;
   focusTopics?: string[];
   availablePeers?: CommunityPeerProfile[];
+  /** Active challenge context if the user is in a challenge */
+  challengeContext?: {
+    challengeId: string | null;
+    completionRate: number;
+    periodDays: number;
+  } | null;
+  /** The user's message/query for personalization */
+  userQuery?: string;
 }
 
 export const COMMUNITY_GUIDE_SCHEMA_VERSION = 'v1';
 
 export function buildCommunityGuidePrompt(input: McpCommunityEngagementSummaryInput): string {
+  const activityLevel = input.postsCount === 0
+    ? 'new or inactive member'
+    : input.postsCount < 5
+    ? 'occasional contributor'
+    : 'active community member';
+
+  const queryContext = input.userQuery
+    ? `The user asked: "${input.userQuery}". Tailor your suggestions to this request.`
+    : '';
+
+  const challengeInfo = input.challengeContext?.challengeId
+    ? `User is in an active challenge with ${Math.round((input.challengeContext.completionRate ?? 0) * 100)}% completion rate.`
+    : 'User is not currently in an active challenge.';
+
   return [
-    'You are a community engagement guide for a wellness app.',
-    'Generate practical, encouraging suggestions to help the user engage in community.',
-    'Return strict JSON only.',
-    'Do not rank people or use popularity metrics.',
-    'Do not reference likes, follower counts, or top users.',
-    'Use neutral, encouraging language.',
+    'You are a community engagement coach for a wellness app.',
+    `The user is a ${activityLevel} (${input.postsCount} posts, ${input.reactionsGivenCount} reactions given).`,
+    challengeInfo,
+    queryContext,
+    'Generate 2-3 practical, specific, encouraging suggestions to help this user engage authentically.',
+    '',
+    'Rules:',
+    '- Return strict JSON only — no markdown, no code fences.',
+    '- Do not rank members by popularity or follower count.',
+    '- Do not reference likes, follower counts, or "top users".',
+    '- Suggested post content must be specific, not generic ("Share your experience" is too vague).',
+    '- Peer outreach prompts should feel personal and warm, not transactional.',
+    '- Use neutral, encouraging language throughout.',
+    '',
     'Output schema:',
     '{',
     '  "schemaVersion": "v1",',
+    '  "engagementApproach": "1-2 sentence strategy tailored to this user\'s activity level and goals",',
     '  "suggestedPosts": [',
-    '    { "title": "string", "contentPrompt": "string", "reason": "string" }',
+    '    {',
+    '      "title": "Specific post title (not generic)",',
+    '      "contentPrompt": "Detailed prompt the user can use verbatim or adapt",',
+    '      "postType": "WIN|QUESTION|CHECK_IN",',
+    '      "reason": "Why this post would resonate with the community"',
+    '    }',
     '  ],',
     '  "suggestedPeers": [',
-    '    { "peerUserId": "string", "outreachPrompt": "string", "reason": "string" }',
+    '    {',
+    '      "peerUserId": "string",',
+    '      "outreachPrompt": "Specific message template the user can send",',
+    '      "reason": "What they have in common or why connecting makes sense"',
+    '    }',
     '  ],',
-    '  "engagementApproach": "string"',
+    '  "quickWin": "One simple action the user can take in the next 5 minutes to engage"',
     '}',
-    `Input summary: ${JSON.stringify(input)}`
+    `Full input context: ${JSON.stringify(input)}`
   ].join('\n');
 }
+
